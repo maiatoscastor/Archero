@@ -1,45 +1,38 @@
-// src/Cenas/MagoExplosivo.js
+// src/MagoExplosivo.js
+
 export default class MagoExplosivo {
   constructor(scene, x, y) {
     this.scene = scene
 
-    // Sprite do mago
-    this.enemy = scene.add.image(x, y, "mago").setScale(0.15) // Assumindo que você tem uma imagem 'mago'
+    this.enemy = scene.add.image(x, y, "mago").setScale(0.15)
     this.enemy.setOrigin(0.5, 0.5)
 
-    // Configurações do mago
     this.maxHealth = 12500
     this.health = this.maxHealth
-    this.speed = 0.5 // Muito lento
+    this.speed = 0.5
     this.damage = 350
 
-    // Sistema de invencibilidade
     this.isInvincible = false
     this.invincibilityDuration = 300
     this.lastDamageTime = 0
 
-    // Movimento estratégico
     this.moveTimer = 0
-    this.moveInterval = 3000 // Move a cada 3 segundos
+    this.moveInterval = 3000
     this.targetPosition = { x: x, y: y }
     this.isMoving = false
 
-    // Sistema de ataques
     this.attackTimer = 0
-    this.attackInterval = 2000 // Ataca a cada 2 segundos
+    this.attackInterval = 2000
     this.isLowHealth = false
     this.explosionCircles = []
 
-    // Teleporte
     this.teleportTimer = 0
-    this.teleportInterval = 8000 // Teleporta a cada 8 segundos
+    this.teleportInterval = 8000
     this.isTeleporting = false
 
-    // Hitbox
     this.hitbox = scene.add.rectangle(x, y, 60, 60, 0x00ff00, 0)
     this.hitbox.setOrigin(0.5, 0.5)
 
-    // Propriedades para compatibilidade
     this.isEnemy = true
     this.isDead = false
 
@@ -52,7 +45,7 @@ export default class MagoExplosivo {
     const yOffset = -70
 
     this.healthBarBg = this.scene.add.rectangle(this.enemy.x, this.enemy.y + yOffset, barWidth, barHeight, 0x000000)
-    this.healthBar = this.scene.add.rectangle(this.enemy.x, this.enemy.y + yOffset, barWidth, barHeight, 0x8a2be2) // Roxo para mago
+    this.healthBar = this.scene.add.rectangle(this.enemy.x, this.enemy.y + yOffset, barWidth, barHeight, 0x8a2be2)
   }
 
   updateHealthBar() {
@@ -63,10 +56,9 @@ export default class MagoExplosivo {
       this.healthBarBg.setPosition(this.enemy.x, this.enemy.y - 70)
       this.healthBar.setPosition(this.enemy.x, this.enemy.y - 70)
 
-      // Verifica se entrou em modo de vida baixa
       if (healthPercent <= 0.3 && !this.isLowHealth) {
         this.isLowHealth = true
-        this.attackInterval = 1200 // Ataques mais frequentes
+        this.attackInterval = 1200
         console.log("Mago entrou em modo fúria!")
       }
     }
@@ -81,20 +73,9 @@ export default class MagoExplosivo {
     this.health -= dano
     this.updateHealthBar()
 
-    // Efeito visual
-    this.scene.tweens.add({
-      targets: this.enemy,
-      tint: 0xff0000,
-      duration: 100,
-      yoyo: true,
-      onComplete: () => {
-        if (!this.isDead) {
-          this.enemy.clearTint()
-        }
-      },
-    })
+    // Dano
+    this.enhancedMageDamageEffect()
 
-    // Remove invencibilidade
     this.scene.time.delayedCall(this.invincibilityDuration, () => {
       this.isInvincible = false
     })
@@ -104,18 +85,102 @@ export default class MagoExplosivo {
     }
   }
 
+  // Dano
+  enhancedMageDamageEffect() {
+    // Cor dano
+    this.scene.tweens.add({
+      targets: this.enemy,
+      tint: 0x9932cc,
+      duration: 150,
+      yoyo: true,
+      onComplete: () => {
+        if (!this.isDead) {
+          this.enemy.clearTint()
+        }
+      },
+    })
+
+    // Pulsação
+    this.scene.tweens.add({
+      targets: this.enemy,
+      scaleX: this.enemy.scaleX * 1.15,
+      scaleY: this.enemy.scaleY * 1.15,
+      duration: 100,
+      yoyo: true,
+      ease: "Power2",
+    })
+
+    // Particulas magicas
+    this.createMagicDamageParticles()
+
+    // Aura mágica
+    this.createMagicAura()
+  }
+
+  // Partículas mágicas específicas
+  createMagicDamageParticles() {
+    for (let i = 0; i < 8; i++) {
+      const particle = this.scene.add.circle(
+        this.enemy.x + Phaser.Math.Between(-25, 25),
+        this.enemy.y + Phaser.Math.Between(-25, 25),
+        Phaser.Math.Between(2, 4),
+        0x9370db,
+      )
+
+      // Movimento em espiral para cima
+      const angle = (i / 8) * Math.PI * 2
+      const targetX = particle.x + Math.cos(angle) * 20
+      const targetY = particle.y - 40 // Sobe
+
+      this.scene.tweens.add({
+        targets: particle,
+        x: targetX,
+        y: targetY,
+        alpha: 0,
+        scaleX: 0.1,
+        scaleY: 0.1,
+        duration: 500,
+        ease: "Power2.easeOut",
+        onComplete: () => particle.destroy(),
+      })
+
+      // Rotação da partícula
+      this.scene.tweens.add({
+        targets: particle,
+        rotation: Math.PI * 2,
+        duration: 500,
+      })
+    }
+  }
+
+  // Aura mágica temporária
+  createMagicAura() {
+    const aura = this.scene.add.circle(this.enemy.x, this.enemy.y, 40, 0x8a2be2, 0.3)
+
+    this.scene.tweens.add({
+      targets: aura,
+      scaleX: 1.5,
+      scaleY: 1.5,
+      alpha: 0,
+      duration: 400,
+      ease: "Power2.easeOut",
+      onComplete: () => aura.destroy(),
+    })
+  }
+
   die(skipCount = false) {
     if (this.isDead) return
     this.isDead = true
 
-    // Limpa círculos de explosão
+    // Efeito morte
+    this.createEnhancedMageDeathEffect()
+
     this.explosionCircles.forEach((circle) => {
       if (circle.graphic) circle.graphic.destroy()
       if (circle.timer) circle.timer.remove()
     })
     this.explosionCircles = []
 
-    // Remove da lista de inimigos
     if (this.scene.enemyGroup) {
       const index = this.scene.enemyGroup.indexOf(this)
       if (index > -1) {
@@ -128,31 +193,81 @@ export default class MagoExplosivo {
       this.scene.monstersKilledThisPhase++
       this.scene.chefaoMorreu()
     }
+  }
 
-    // Efeito de morte
+  // Efeito morte
+  createEnhancedMageDeathEffect() {
+    // Explosão final
+    const finalExplosion = this.scene.add.circle(this.enemy.x, this.enemy.y, 80, 0x9932cc, 0.6)
+    this.scene.tweens.add({
+      targets: finalExplosion,
+      scaleX: 3,
+      scaleY: 3,
+      alpha: 0,
+      duration: 800,
+      ease: "Power2.easeOut",
+      onComplete: () => finalExplosion.destroy(),
+    })
+
+    // Ondas energia
+    for (let wave = 0; wave < 3; wave++) {
+      this.scene.time.delayedCall(wave * 150, () => {
+        const energyWave = this.scene.add.circle(this.enemy.x, this.enemy.y, 20, 0x8a2be2, 0.4)
+        this.scene.tweens.add({
+          targets: energyWave,
+          scaleX: 4,
+          scaleY: 4,
+          alpha: 0,
+          duration: 600,
+          ease: "Power2.easeOut",
+          onComplete: () => energyWave.destroy(),
+        })
+      })
+    }
+
+    // Particulas magicas
+    for (let i = 0; i < 12; i++) {
+      const particle = this.scene.add.circle(this.enemy.x, this.enemy.y, Phaser.Math.Between(4, 8), 0x9370db)
+
+      const angle = (i / 12) * Math.PI * 2
+      const distance = Phaser.Math.Between(60, 100)
+
+      this.scene.tweens.add({
+        targets: particle,
+        x: particle.x + Math.cos(angle) * distance,
+        y: particle.y + Math.sin(angle) * distance,
+        rotation: Math.PI * 4,
+        alpha: 0,
+        duration: 1000,
+        ease: "Power2.easeOut",
+        onComplete: () => particle.destroy(),
+      })
+    }
+
+    // Mago desaparecer
     this.scene.tweens.add({
       targets: [this.enemy, this.healthBar, this.healthBarBg],
       alpha: 0,
-      scale: 0,
-      duration: 500,
+      scaleX: 0,
+      scaleY: 0,
+      duration: 800,
+      delay: 200,
       onComplete: () => {
         this.destroy()
       },
     })
   }
 
-  // Movimento estratégico
+
   moveStrategically() {
     if (this.isDead || this.isTeleporting) return
 
     const now = this.scene.time.now
 
     if (now - this.moveTimer > this.moveInterval && !this.isMoving) {
-      // Escolhe nova posição estratégica
       const bounds = this.scene.gridBounds
       const player = this.scene.player.player
 
-      // Tenta manter distância do jogador
       let newX, newY
       do {
         newX = Phaser.Math.Between(bounds.left + 60, bounds.right - 60)
@@ -164,12 +279,21 @@ export default class MagoExplosivo {
       this.moveTimer = now
     }
 
-    // Move em direção ao alvo
     if (this.isMoving) {
-      const distance = Phaser.Math.Distance.Between(this.enemy.x, this.enemy.y, this.targetPosition.x, this.targetPosition.y)
+      const distance = Phaser.Math.Distance.Between(
+        this.enemy.x,
+        this.enemy.y,
+        this.targetPosition.x,
+        this.targetPosition.y,
+      )
 
       if (distance > 5) {
-        const angle = Phaser.Math.Angle.Between(this.enemy.x, this.enemy.y, this.targetPosition.x, this.targetPosition.y)
+        const angle = Phaser.Math.Angle.Between(
+          this.enemy.x,
+          this.enemy.y,
+          this.targetPosition.x,
+          this.targetPosition.y,
+        )
         this.enemy.x += Math.cos(angle) * this.speed
         this.enemy.y += Math.sin(angle) * this.speed
         this.hitbox.setPosition(this.enemy.x, this.enemy.y)
@@ -179,7 +303,6 @@ export default class MagoExplosivo {
     }
   }
 
-  // Sistema de teleporte
   handleTeleport() {
     if (this.isDead) return
 
@@ -194,14 +317,12 @@ export default class MagoExplosivo {
   startTeleport() {
     this.isTeleporting = true
 
-    // Efeito visual de desaparecimento
     this.scene.tweens.add({
       targets: this.enemy,
       alpha: 0,
       scale: 0.5,
       duration: 300,
       onComplete: () => {
-        // Reposiciona
         const bounds = this.scene.gridBounds
         const newX = Phaser.Math.Between(bounds.left + 60, bounds.right - 60)
         const newY = Phaser.Math.Between(bounds.top + 60, bounds.bottom - 60)
@@ -209,7 +330,6 @@ export default class MagoExplosivo {
         this.enemy.setPosition(newX, newY)
         this.hitbox.setPosition(newX, newY)
 
-        // Efeito de reaparecimento
         this.scene.tweens.add({
           targets: this.enemy,
           alpha: 1,
@@ -223,7 +343,6 @@ export default class MagoExplosivo {
     })
   }
 
-  // Sistema de ataques com círculos explosivos
   handleAttacks() {
     if (this.isDead || this.isTeleporting) return
 
@@ -243,20 +362,16 @@ export default class MagoExplosivo {
     const player = this.scene.player.player
     const bounds = this.scene.gridBounds
 
-    // Posição próxima ao jogador ou aleatória
     let targetX, targetY
     if (Math.random() < 0.7) {
-      // 70% chance de mirar próximo ao jogador
       const offset = 80
       targetX = player.x + Phaser.Math.Between(-offset, offset)
       targetY = player.y + Phaser.Math.Between(-offset, offset)
     } else {
-      // 30% chance de posição aleatória
       targetX = Phaser.Math.Between(bounds.left + 40, bounds.right - 40)
       targetY = Phaser.Math.Between(bounds.top + 40, bounds.bottom - 40)
     }
 
-    // Garante que fica dentro dos limites
     targetX = Phaser.Math.Clamp(targetX, bounds.left + 40, bounds.right - 40)
     targetY = Phaser.Math.Clamp(targetY, bounds.top + 40, bounds.bottom - 40)
 
@@ -275,7 +390,6 @@ export default class MagoExplosivo {
   createExplosionAt(x, y) {
     const radius = 50
 
-    // Cria círculo vermelho de aviso
     const warningCircle = this.scene.add.circle(x, y, radius, 0xff0000, 0.3)
     warningCircle.setStrokeStyle(3, 0xff0000)
 
@@ -287,7 +401,6 @@ export default class MagoExplosivo {
       timer: null,
     }
 
-    // Timer para explosão
     explosionData.timer = this.scene.time.delayedCall(1000, () => {
       this.explodeCircle(explosionData)
     })
@@ -298,12 +411,10 @@ export default class MagoExplosivo {
   explodeCircle(explosionData) {
     if (this.isDead) return
 
-    // Remove círculo de aviso
     if (explosionData.graphic) {
       explosionData.graphic.destroy()
     }
 
-    // Efeito de explosão
     const explosionEffect = this.scene.add.circle(explosionData.x, explosionData.y, explosionData.radius, 0xff4500, 0.8)
 
     this.scene.tweens.add({
@@ -317,7 +428,6 @@ export default class MagoExplosivo {
       },
     })
 
-    // Verifica dano ao jogador
     const player = this.scene.player.player
     const distance = Phaser.Math.Distance.Between(player.x, player.y, explosionData.x, explosionData.y)
 
@@ -326,7 +436,6 @@ export default class MagoExplosivo {
       this.scene.showDamage(player.x, player.y - 40, this.damage, "#ff4444", "player")
     }
 
-    // Remove da lista
     const index = this.explosionCircles.indexOf(explosionData)
     if (index > -1) {
       this.explosionCircles.splice(index, 1)
@@ -343,7 +452,6 @@ export default class MagoExplosivo {
   }
 
   destroy() {
-    // Limpa círculos de explosão
     this.explosionCircles.forEach((circle) => {
       if (circle.graphic) circle.graphic.destroy()
       if (circle.timer) circle.timer.remove()

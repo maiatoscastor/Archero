@@ -44,11 +44,15 @@ export default class Player {
       strokeThickness: 4,
     })
 
-    // Variáveis de controle de invencibilidade
+    // Variáveis de controle de invencibilidade (para receber dano)
     this.invincibleTime = 0
     this.invincibleDuration = 1000
 
-    // Variáveis de controle de cooldown para dano do player
+    // Variáveis de controle de cooldown para CAUSAR dano de colisão
+    this.lastCollisionDamageTime = 0
+    this.collisionDamageCooldown = 800 // 800ms entre cada dano de colisão que o player causa
+
+    // Variáveis de controle de cooldown para dano do player (mantido para compatibilidade)
     this.lastDamageTime = 0
     this.damageCooldown = 1000
 
@@ -74,6 +78,7 @@ export default class Player {
     this.invincibleTime = 0
     this.lastDamageTime = 0
     this.lastArrowTime = 0
+    this.lastCollisionDamageTime = 0 // Reset do cooldown de dano de colisão
 
     // Reseta a textura do jogador
     this.player.setTexture("player")
@@ -97,6 +102,16 @@ export default class Player {
       this.updateHealthText()
       this.invincibleTime = this.scene.time.now
     }
+  }
+
+  // Verifica se o player pode causar dano de colisão
+  canDealCollisionDamage() {
+    return this.scene.time.now - this.lastCollisionDamageTime > this.collisionDamageCooldown
+  }
+
+  // Registra que o player causou dano de colisão
+  dealCollisionDamage() {
+    this.lastCollisionDamageTime = this.scene.time.now
   }
 
   updateHealthBar() {
@@ -221,7 +236,7 @@ export default class Player {
       return // Não faz nada se o jogo acabou
     }
 
-    // Não permite movimento se estiver selecionando poder
+    // Não permite movimento se estiver a selecionar poder
     if (!this.canMove || (this.scene.powerUpSystem && this.scene.powerUpSystem.isSelectingPower)) {
       this.updateHealthBar()
       this.updateHealthText()
@@ -276,7 +291,7 @@ export default class Player {
     // Disparo automático com múltiplas flechas
     const isStopped = dx === 0 && dy === 0
     if (isStopped && this.scene.time.now - this.lastArrowTime > this.arrowCooldown) {
-      this.shootArrows() // Usa a nova função de múltiplas flechas
+      this.shootArrows() // Usa função de múltiplas flechas
       this.lastArrowTime = this.scene.time.now
     }
   }

@@ -24,7 +24,7 @@ export default class MainMenuScene extends Phaser.Scene {
     // Adiciona o comportamento de clique no botão "Jogar"
     playButton.on('pointerdown', () => {
       // Ao clicar, o jogo começa
-      this.scene.start('GameScene'); // Substitua 'GameScene' pelo nome da cena que você deseja carregar
+      this.scene.start('GameScene'); // Carregar gameScene
     });
   }
 }

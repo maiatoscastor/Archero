@@ -9,6 +9,7 @@ import ChefaoDividido from "../ChefaoDividido.js"
 import MagoExplosivo from "../MagoExplosivo.js"
 import PowerUpSystem from "../PowerUpSystem.js"
 
+
 export default class GameScene extends Phaser.Scene {
   constructor() {
     super({ key: "GameScene" })
@@ -26,6 +27,11 @@ export default class GameScene extends Phaser.Scene {
     this.powerUpShown = false
     this.gameOver = false
     this.enemiesActive = false
+
+    // Estatisticas jogo
+    this.gameStartTime = 0
+    this.totalDamageDealt = 0
+    this.totalDamageTaken = 0
 
     console.log("Estado do jogo resetado para valores iniciais")
   }
@@ -56,6 +62,12 @@ export default class GameScene extends Phaser.Scene {
   create() {
     // Reseta o estado do jogo sempre que a cena é criada
     this.resetGameState()
+
+    // Tempo do jogo
+    this.gameStartTime = this.time.now
+
+    // Cria a interface de botões de teste
+    this.createTestButtons()
 
     // Criar a grelha de quadrados intercalados
     const cols = 9
@@ -251,7 +263,7 @@ export default class GameScene extends Phaser.Scene {
 
   // Nova função para aplicar buff de dificuldade
   applyPhaseBuffToEnemies() {
-    // Calcula o buff baseado na fase (fase 1 = sem buff, fase 2 = +20 vida +3 dano, etc.)
+    // Calcula o buff baseado na fase (fase 1 = sem buff, fase 2 = +20 vida +3 dano)
     const phaseMultiplier = this.currentPhase - 1
     const healthBonus = phaseMultiplier * 20
     const damageBonus = phaseMultiplier * 3
@@ -350,6 +362,15 @@ export default class GameScene extends Phaser.Scene {
     return Phaser.Math.Distance.Between(x, y, this.player.player.x, this.player.player.y) < 400
   }
 
+  // Registar estatísticas
+  recordDamageDealt(amount) {
+    this.totalDamageDealt += amount
+  }
+
+  recordDamageTaken(amount) {
+    this.totalDamageTaken += amount
+  }
+
   // Nova função para verificar se deve mostrar seleção de poder
   checkForPowerUpSelection() {
     // Só mostra se todos os monstros foram mortos e ainda não mostrou
@@ -379,26 +400,37 @@ export default class GameScene extends Phaser.Scene {
       }
     }
 
-    // Verificar colisão entre jogador e inimigos
+    // Verificação de colisão
     for (const enemy of this.enemyGroup) {
       if (enemy.health > 0 && !enemy.isDead) {
         if (Phaser.Geom.Intersects.RectangleToRectangle(this.player.hitbox.getBounds(), enemy.hitbox.getBounds())) {
-          this.player.takeDamage(enemy.damage || 25)
-          this.showDamage(this.player.player.x, this.player.player.y - 40, enemy.damage || 25, "#ff4444", "player")
+          // Inimigo causa dano no player (mantém como estava)
+          const damageAmount = enemy.damage || 25
+          this.player.takeDamage(damageAmount)
+          this.recordDamageTaken(damageAmount)
+          this.showDamage(this.player.player.x, this.player.player.y - 40, damageAmount, "#ff4444", "player")
 
-          enemy.takeDamage(10)
-          this.showDamage(
-            enemy.enemy.x,
-            enemy.enemy.y - 40,
-            10,
-            "#ffffff",
-            "enemy_" + enemy.enemy.x + "_" + enemy.enemy.y,
-          )
+          // Player só causa dano no inimigo se estiver fora do cooldown
+          if (this.player.canDealCollisionDamage()) {
+            const playerDamage = 10
+            enemy.takeDamage(playerDamage)
+            this.recordDamageDealt(playerDamage)
+            this.showDamage(
+              enemy.enemy.x,
+              enemy.enemy.y - 40,
+              playerDamage,
+              "#ffffff",
+              "enemy_" + enemy.enemy.x + "_" + enemy.enemy.y,
+            )
+
+            // Regista que o player causou dano (ativa o cooldown)
+            this.player.dealCollisionDamage()
+          }
         }
       }
     }
 
-    // Verifica se deve mostrar seleção de poder ANTES da porta
+    // Verifica se deve mostrar seleção de poder antes da porta
     if (!this.checkForPowerUpSelection()) {
       // Só mostra a porta se não estiver selecionando poder
       if (this.monstersKilledThisPhase >= this.monstersToKill && !this.powerUpSystem.isSelectingPower) {
@@ -436,10 +468,43 @@ export default class GameScene extends Phaser.Scene {
       return
     }
 
-    // Agora só avança a fase, pois a seleção de poder já foi feita
+    // Lógica para vencer a fase
     this.score += 1
     this.currentPhase += 1
+    this.monstersKilledThisPhase = 0
+    this.chefaoDerrotado = false
+
+    // Se a fase for a 50 (fim do jogo), mostra a tela de vitória
+    if (this.currentPhase > 50) {
+      // Calcula as estatísticas finais
+      const gameTime = this.calculateGameTime()
+      const killedMonsters = this.monstersKilled
+      const totalDamage = this.totalDamageDealt
+
+      // Pausa gameScene e lança a WinScene
+      this.scene.pause()
+      this.scene.launch("WinScene", {
+        gameTime: gameTime,
+        killedMonsters: killedMonsters,
+        totalDamage: totalDamage,
+        damageTaken: this.totalDamageTaken,
+        finalPhase: 50,
+      })
+
+      return
+    }
+
+    // Caso contrário, continue para a próxima fase
     this.continuePhase()
+  }
+
+  // Calcular estatísticas
+  calculateGameTime() {
+    return Math.floor((this.time.now - this.gameStartTime) / 1000)
+  }
+
+  calculateTotalDamage() {
+    return this.totalDamageDealt
   }
 
   continuePhase() {
@@ -556,6 +621,122 @@ export default class GameScene extends Phaser.Scene {
       damageButton.destroy()
       this.time.delayedCall(2500, () => {
         this.advancePhase()
+      })
+    })
+  }
+
+  createTestButtons() {
+    // Cria um painel lateral para os botões
+    const buttonPanel = this.add
+      .rectangle(0, this.cameras.main.height / 2, 200, this.cameras.main.height, 0x000000, 0.5)
+      .setOrigin(0, 0.5)
+    buttonPanel.setDepth(100) // Coloca o painel acima dos elementos do jogo
+
+    // Botão para aumentar dano
+    const increaseDamageButton = this.add
+      .text(10, 50, "Aumentar Dano", { fontSize: "18px", fill: "#fff" })
+      .setInteractive()
+      .on("pointerdown", () => {
+        this.player.arrowDamage += 50
+        console.log("Dano aumentado: ", this.player.arrowDamage)
+      })
+
+    // Botão para diminuir dano
+    const decreaseDamageButton = this.add
+      .text(10, 100, "Diminuir Dano", { fontSize: "18px", fill: "#fff" })
+      .setInteractive()
+      .on("pointerdown", () => {
+        this.player.arrowDamage = Math.max(0, this.player.arrowDamage - 50) // Diminui o dano sem passar de 0
+        console.log("Dano diminuído: ", this.player.arrowDamage)
+      })
+
+    // Botão para dar mais vida
+    const increaseHealthButton = this.add
+      .text(10, 150, "Aumentar Vida", { fontSize: "18px", fill: "#fff" })
+      .setInteractive()
+      .on("pointerdown", () => {
+        this.player.health = Math.min(this.player.maxHealth, this.player.health + 500)
+        this.player.updateHealthBar()
+        this.player.updateHealthText()
+        console.log("Vida aumentada: ", this.player.health)
+      })
+
+    // Botão para diminuir vida
+    const decreaseHealthButton = this.add
+      .text(10, 200, "Diminuir Vida", { fontSize: "18px", fill: "#fff" })
+      .setInteractive()
+      .on("pointerdown", () => {
+        this.player.health = Math.max(0, this.player.health - 500)
+        this.player.updateHealthBar()
+        this.player.updateHealthText()
+        console.log("Vida diminuída: ", this.player.health)
+      })
+
+    // Botão para aumentar fase
+    const increasePhaseButton = this.add
+      .text(10, 250, "Aumentar Fase", { fontSize: "18px", fill: "#fff" })
+      .setInteractive()
+      .on("pointerdown", () => {
+        this.currentPhase += 1 // Aumenta a fase
+        this.advancePhase()
+        console.log("Fase aumentada para: ", this.currentPhase)
+      })
+
+    // Botão para diminuir fase
+    const decreasePhaseButton = this.add
+      .text(10, 300, "Diminuir Fase", { fontSize: "18px", fill: "#fff" })
+      .setInteractive()
+      .on("pointerdown", () => {
+        this.currentPhase = Math.max(1, this.currentPhase - 1) // Diminui a fase, mas não abaixo de 1
+        this.advancePhase()
+        console.log("Fase diminuída para: ", this.currentPhase)
+      })
+
+    // Botão para resetar o jogo
+    const resetGameButton = this.add
+      .text(10, 350, "Resetar Jogo", { fontSize: "18px", fill: "#fff" })
+      .setInteractive()
+      .on("pointerdown", () => {
+        this.player.die() // Faz o jogador morrer
+        this.resetGameState()
+        this.scene.restart() // Reinicia a cena do jogo
+        console.log("Jogo resetado")
+      })
+
+    // Botão testar vitória (modificado)
+    const testWinButton = this.add
+      .text(10, 400, "Testar Vitória", { fontSize: "18px", fill: "#0f0" })
+      .setInteractive()
+      .on("pointerdown", () => {
+        // Pausa cena atuala e lança winscreen
+        this.scene.pause()
+        this.scene.launch("WinScene", {
+          gameTime: 1200, // 20 minutos
+          killedMonsters: 250,
+          totalDamage: 50000,
+          damageTaken: 1500,
+          finalPhase: 50,
+        })
+        console.log("Testando tela de vitória")
+      })
+
+    // Todos os botões têm o mesmo estilo de hover
+    ;[
+      increaseDamageButton,
+      decreaseDamageButton,
+      increaseHealthButton,
+      decreaseHealthButton,
+      increasePhaseButton,
+      decreasePhaseButton,
+      resetGameButton,
+      testWinButton,
+    ].forEach((button) => {
+      button.on("pointerover", () => {
+        button.setStyle({ fill: "#ff0" }) // Muda a cor para amarelo ao passar o mouse
+      })
+
+      button.on("pointerout", () => {
+        button.setStyle({ fill: button === testWinButton ? "#0f0" : "#fff" }) // Restaura a cor original
       })
     })
   }

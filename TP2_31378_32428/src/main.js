@@ -2,6 +2,7 @@
 
 import MainMenuScene from './Cenas/MainMenuScene.js';  // Importe a cena do menu principal
 import GameScene from './Cenas/gameScene.js';  // Importe a cena do jogo
+import WinScene from './Cenas/WinScene.js' // Import tela de win
 
 const config = {
   type: Phaser.AUTO,
@@ -14,7 +15,7 @@ const config = {
       debug: false
     }
   },
-  scene: [MainMenuScene, GameScene]  // Adicione a cena MainMenuScene ao array de cenas
+  scene: [MainMenuScene, GameScene, WinScene]
 };
 
 const game = new Phaser.Game(config);
